@@ -196,13 +196,12 @@ def master_func(url):
     get_links(url)
     driver = webdriver.Chrome(executable_path=chrome_driver_path)
     driver.get(url)
-    loop = True
     for l in links_list:
         try:
             get_company_profile(driver, l)
         except WebDriverException:
-            print("Connection Timed Out for {url}")
-            return
+            print(f"Connection Timed Out for {url}")
+            pass
         else:
             continue
         finally:
