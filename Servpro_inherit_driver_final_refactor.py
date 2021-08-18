@@ -17,6 +17,9 @@ from selenium.common.exceptions import NoSuchElementException
 import time
 import re
 from selenium.webdriver.chrome.options import Options
+from pprint import PrettyPrinter
+from openpyxl import Workbook
+
 
 # url = "https://www.servprocentralantelope.com/"
 
@@ -74,7 +77,7 @@ def get_name_phone_website(driver, url):
 
 
 def get_email_address_state(url):
-    my_dict = {"Email": [], "Address": [], "State": []}
+    my_dict = {"Email": [], "Description": [], "State": [], "Company": []}
     page = requests.get(url)
     soup = BeautifulSoup(page.content, 'lxml')
     try:
@@ -85,18 +88,21 @@ def get_email_address_state(url):
     else:
         my_dict["Email"].append(email)
     try:
-        address = soup.find("div", {"class": "col-sm-6 col-md-5"}).text
+        description = soup.find("div", {"class": "col-sm-6 col-md-5"}).text
         s1 = soup.find("div", {"class": "col-sm-6 col-md-5"}).text
         reversed_list = list(reversed(s1))[18:20]
         un_reversed = list(reversed(reversed_list))
         state = ''.join(un_reversed)
+        company = description.split("\n")[1]
     except AttributeError as a:
         print(f"{a} in address for {url}")
-        my_dict["Address"].append("No Address")
+        my_dict["Description"].append("No Description")
         my_dict["State"].append("No State")
+        my_dict["Company"].append("No Company")
     else:
-        my_dict["Address"].append(address)
+        my_dict["Description"].append(description)
         my_dict["State"].append(state)
+        my_dict["Company"].append(company)
     return my_dict
 
 
@@ -125,15 +131,21 @@ def clean_dict(my_dict):
         contact_list.append(my_dict)
 
 
+def dict_update():
+    for d in contact_list:
+        d.update({"Lead Source": "Direct", "Vertical": "Home Services",
+                  "Sub-Vertical": "Interiors", "Acquisition Source": "Sales Ops Scrape", "Country": "United States"})
+
+
 def test_pop_up(driver, url):
     try:
-        time.sleep(3)
         link_click = driver.find_element(By.LINK_TEXT, "CONTACT US")
         link_click.click()
         WebDriverWait(driver, 15).until(EC.url_changes(url))
         url = driver.current_url
     except NoSuchElementException as n:
-        #print(f"{n} in test_pop for {url}")
+        # print(f"{n} in test_pop for {url}")
+        time.sleep(5)
         iframe = driver.find_element_by_xpath(
             "//iframe[contains(@id,'zychatObject')]")
         driver.switch_to.frame(iframe)
@@ -184,9 +196,19 @@ def get_company_profile(driver, url):
         my_dict2 = get_contact_us_page(driver, new_url)
         merged_dict = merge(my_dict1, my_dict2)
         clean_dict(merged_dict)
+        dict_update()
         return
         # print(my_dict1)
         # print(my_dict2)
+
+
+def to_excel():
+    df = pd.DataFrame(contact_list, columns=["Name", "Phone", "Website", "Email", "Description", "State", "Company",
+                                             "Lead Source", "Vertical", "Sub-Vertical", "Acquisition Source", "Country"])
+    with ExcelWriter("Servpro.xlsx") as writer:
+        df.to_excel(writer)
+    pd.DataFrame(no_company_or_contact, dtype="string").to_csv(
+        "No_Name_Contact_List.csv")
 
 
 url = 'https://www.servpro.com/sitemap/'
@@ -196,27 +218,20 @@ def master_func(url):
     get_links(url)
     driver = webdriver.Chrome(executable_path=chrome_driver_path)
     driver.get(url)
-    for l in links_list:
+    for l in links_list[3255:]:
         try:
             get_company_profile(driver, l)
         except WebDriverException:
             print(f"Connection Timed Out for {url}")
-            pass
-        else:
             continue
+        else:
+            pass
         finally:
+            to_excel()
             if len(l) < 0:
                 driver.quit()
 
 
 master_func(url)
 
-
-def to_csv():
-    pd.DataFrame(contact_list, columns=[
-                 "Name", "Phone", "Website", "Email", "Address", "State"], dtype="string").to_csv("SERVPRO.csv")
-    pd.DataFrame(no_company_or_contact, dtype="string").to_csv(
-        "No_Name_Contact_List.csv")
-
-
-to_csv()
+# write to xls file or use regex to gix dictionary area see about logging at specific startpoint see if scrapes check for options in pandas
